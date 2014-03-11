@@ -396,6 +396,7 @@ function GetJavascriptIndent()
   " Set up variables for current line.
   let line = getline(lnum)
   let ind = indent(lnum)
+  let r_ind = ind
 
   if s:Match(lnum, s:continuation_regex) == 0
     let soe = s:GetStartOfExpression(lnum)
@@ -416,12 +417,12 @@ function GetJavascriptIndent()
     let counts = s:LineHasOpeningBrackets(lnum)
     if counts[0] == '1' && searchpair('(', '', ')', 'bW', s:skip_expr) > 0
       if col('.') + 1 == col('$')
-        return ind + &sw
+        return r_ind + &sw
       else
         return virtcol('.')
       endif
     elseif counts[1] == '1' || counts[2] == '1'
-      return ind + &sw
+      return r_ind + &sw
     else
       call cursor(v:lnum, vcol)
     end
