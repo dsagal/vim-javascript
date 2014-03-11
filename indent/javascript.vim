@@ -351,14 +351,7 @@ function GetJavascriptIndent()
       if line[col-1]==')' && col('.') != col('$') - 1
         let ind = virtcol('.')-1
       else
-        " If the start of the match has only whitespace or other opening braces
-        " before it, then match that start brace, i.e. don't consider it a continuation.
-        let startLine = getline(line('.'))
-        if match(startLine[0:col('.')-2], '^\%(\s\|[({[]\)*$') != -1
-          let ind = virtcol('.')-1
-        else
-          let ind = indent(s:GetMSL(line('.'), 0))
-        endif
+        let ind = indent(s:GetMSL(line('.'), 0))
       endif
     endif
     return ind
