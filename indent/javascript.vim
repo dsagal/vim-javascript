@@ -52,9 +52,11 @@ let s:continuation_regex = '\%([\\*+/.:]\|\%(<%\)\@<![=-]\|\W[|&?]\|||\|&&\)' . 
 
 " Regex that defines continuation lines.
 " TODO: this needs to deal with if ...: and so on
-let s:msl_regex = '\%([\\*+/.:([]\|\%(<%\)\@<![=-]\|\W[|&?]\|||\|&&\)' . s:line_term
+"let s:msl_regex = '\%([\\*+/.:([]\|\%(<%\)\@<![=-]\|\W[|&?]\|||\|&&\)' . s:line_term
+let s:msl_regex = s:continuation_regex
 
 let s:one_line_scope_regex = '\<\%(if\|else\|for\|while\)\>[^{;]*' . s:line_term
+let s:ends_in_semicolon = ';' . s:line_term
 
 " Regex that defines blocks.
 let s:block_regex = '\%([{[]\)\s*\%(|\%([*@]\=\h\w*,\=\s*\)\%(,\s*[*@]\=\h\w*\)*|\)\=' . s:line_term
@@ -143,6 +145,21 @@ function s:GetMSL(lnum, in_one_line_scope)
   return msl
 endfunction
 
+function s:GetStartOfExpression(lnum)
+  let lnum = a:lnum
+  if searchpair('[({[]', '', '[])}]', 'bW', s:skip_expr) > 0
+    let lnum_start = line('.')
+    let col_start = col('.')
+    let line = getline(lnum_start)
+    let eol = match(line, s:line_term) + 1
+    if col_start == eol - 1
+      return [lnum_start, indent(lnum_start) + &sw]
+    endif
+    return [lnum_start, col_start]
+  endif
+  return [lnum, 0]
+endfunction
+
 function s:RemoveTrailingComments(content)
   let single = '\/\/\(.*\)\s*$'
   let multi = '\/\*\(.*\)\*\/\s*$'
@@ -158,6 +175,9 @@ function s:InMultiVarStatement(lnum)
   " loop through previous expressions to find a var statement
   while lnum > 0
     let line = getline(lnum)
+    if (line =~ s:ends_in_semicolon)
+      return 0
+    endif
 
     " if the line is a js keyword
     if (line =~ s:js_keywords)
@@ -344,11 +364,6 @@ function GetJavascriptIndent()
     return ind
   endif
 
-  " If the line is comma first, dedent 1 level
-  if (getline(prevline) =~ s:comma_first)
-    return indent(prevline) - &sw
-  endif
-
   if (line =~ s:ternary)
     if (getline(prevline) =~ s:ternary_q)
       return indent(prevline)
@@ -361,12 +376,6 @@ function GetJavascriptIndent()
   if s:IsInMultilineComment(v:lnum, 1) && !s:IsLineComment(v:lnum, 1)
     return cindent(v:lnum)
   endif
-
-  " Check for multiple var assignments
-"  let var_indent = s:GetVarIndent(v:lnum)
-"  if var_indent >= 0
-"    return var_indent
-"  endif
 
   " 3.3. Work on the previous line. {{{2
   " -------------------------------
@@ -394,6 +403,14 @@ function GetJavascriptIndent()
   " Set up variables for current line.
   let line = getline(lnum)
   let ind = indent(lnum)
+
+  if s:Match(lnum, s:continuation_regex) == 0
+    let soe = s:GetStartOfExpression(lnum)
+    call cursor(v:lnum, vcol)
+    if soe[1] < ind || soe[0] >= lnum
+      let ind = soe[1]
+    endif
+  endif
 
   " If the previous line ended with a block opening, add a level of indent.
   if s:Match(lnum, s:block_regex)
@@ -436,6 +453,13 @@ function GetJavascriptIndent()
       let ols = s:InOneLineScope(ols - 1)
     endwhile
   endif
+
+  " Check for multiple var assignments
+  let var_indent = s:GetVarIndent(v:lnum)
+  if var_indent > ind
+    return var_indent
+  endif
+
 
   return ind
 endfunction
