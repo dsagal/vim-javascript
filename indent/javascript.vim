@@ -145,8 +145,7 @@ function s:GetMSL(lnum, in_one_line_scope)
   return msl
 endfunction
 
-function s:GetStartOfExpression(lnum)
-  let lnum = a:lnum
+function s:GetStartOfExpression()
   if searchpair('[({[]', '', '[])}]', 'bW', s:skip_expr) > 0
     let lnum_start = line('.')
     let col_start = col('.')
@@ -157,7 +156,6 @@ function s:GetStartOfExpression(lnum)
     endif
     return [lnum_start, col_start]
   endif
-  return [lnum, 0]
 endfunction
 
 function s:RemoveTrailingComments(content)
@@ -399,9 +397,16 @@ function GetJavascriptIndent()
   let r_ind = ind
 
   if s:Match(lnum, s:continuation_regex) == 0
-    let soe = s:GetStartOfExpression(lnum)
+    let soe = s:GetStartOfExpression()
+    call cursor(lnum, 1)
+    let soe_prev = s:GetStartOfExpression()
     call cursor(v:lnum, vcol)
-    if soe[1] < ind || soe[0] >= lnum
+    "echom "soe" "prev" soe_prev[0] soe_prev[1] "curr" soe[0] soe[1] "ind" ind
+    if soe[0] < lnum && soe[1] > ind
+      "Don't increase the indent from the previous line if we matched an earlier opening char.
+    elseif soe[0] == soe_prev[0] && soe[1] == soe_prev[1]
+      "Don't touch the indent if there is no brace change from the previous line.
+    else
       let ind = soe[1]
     endif
   endif
